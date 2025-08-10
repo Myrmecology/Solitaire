@@ -42,19 +42,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut game = GameState::new();
     let mut last_draw = Instant::now();
     let mut auto_completing = false;
-    let mut needs_redraw = true;  // Only redraw when needed
-    let mut last_move_count = 0;
+    let mut force_redraw = true;
+    
+    // Initial draw
+    display.draw_game(&game)?;
     
     // Main game loop
     loop {
-        // Only draw when something changed
-        if needs_redraw || auto_completing {
-            display.draw_game(&game)?;
-            needs_redraw = false;
-        }
-        
         // Check for win
-        if game.is_won() {
+        if game.is_won() && !auto_completing {
             display.draw_win_animation()?;
             thread::sleep(Duration::from_secs(3));
             break;
@@ -62,77 +58,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         // Auto-complete mode
         if auto_completing {
-            if last_draw.elapsed() > Duration::from_millis(200) {  // Slower animation
+            if last_draw.elapsed() > Duration::from_millis(200) {
                 if !auto_complete(&mut game) {
                     auto_completing = false;
                 }
+                display.draw_game(&game)?;
                 last_draw = Instant::now();
-                needs_redraw = true;
             }
         }
         
         // Handle input
         let action = input_handler.poll_input();
         
-        match action {
-            InputAction::None => {
-                // No action, don't redraw
-            }
-            InputAction::MouseClick(x, y) | InputAction::MouseDrag(x, y) => {
-                // Store state before handling action
-                let old_selected = game.selected_card;
-                let old_move_count = game.move_count;
-                
-                if handle_game_action(&mut game, InputAction::MouseClick(x, y)) {
-                    break;  // Quit was confirmed
-                }
-                
-                // Only redraw if something actually changed
-                if old_selected != game.selected_card || old_move_count != game.move_count {
-                    needs_redraw = true;
-                }
-            }
+        // Store state before action
+        let old_selected = game.selected_card;
+        let old_moves = game.move_count;
+        let old_score = game.score;
+        let old_waste_len = game.waste.len();
+        let old_stock_len = game.stock.len();
+        
+        let should_quit = match action {
+            InputAction::None => false,
             InputAction::Quit => {
                 if confirm_quit()? {
                     break;
                 }
-                needs_redraw = true;
+                force_redraw = true;
+                false
             }
             InputAction::AutoMove => {
-                // Try single auto-move first
                 if !game.auto_move_to_foundation() {
-                    // If no single move, try auto-complete
                     auto_completing = true;
                 }
-                needs_redraw = true;
+                force_redraw = true;
+                false
             }
-            InputAction::Hint => {
-                needs_redraw = true;
-            }
-            _ => {
-                // Store move count before action
-                let old_move_count = game.move_count;
-                
-                if handle_game_action(&mut game, action) {
-                    break;  // Quit was confirmed
-                }
-                
-                // Only redraw if a move was made or selection changed
-                if game.move_count != old_move_count {
-                    needs_redraw = true;
-                    last_move_count = game.move_count;
-                } else if matches!(action, InputAction::SelectColumn(_) | 
-                                          InputAction::SelectWaste | 
-                                          InputAction::DrawFromStock |
-                                          InputAction::Undo |
-                                          InputAction::ToggleDrawCount) {
-                    needs_redraw = true;
-                }
-            }
+            _ => handle_game_action(&mut game, action)
+        };
+        
+        if should_quit {
+            break;
+        }
+        
+        // Only redraw if something changed
+        if force_redraw || 
+           old_selected != game.selected_card ||
+           old_moves != game.move_count ||
+           old_score != game.score ||
+           old_waste_len != game.waste.len() ||
+           old_stock_len != game.stock.len() {
+            display.draw_game(&game)?;
+            force_redraw = false;
         }
         
         // Small delay to prevent CPU spinning
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(10));
     }
     
     // Cleanup
@@ -154,46 +134,45 @@ fn show_welcome_screen() -> Result<(), Box<dyn std::error::Error>> {
         MoveTo(0, 0)
     )?;
     
-    let welcome = r#"
-    ╔══════════════════════════════════════════════════════════╗
-    ║                                                          ║
-    ║     ███╗   ██╗███████╗ ██████╗ ███╗   ██╗              ║
-    ║     ████╗  ██║██╔════╝██╔═══██╗████╗  ██║              ║
-    ║     ██╔██╗ ██║█████╗  ██║   ██║██╔██╗ ██║              ║
-    ║     ██║╚██╗██║██╔══╝  ██║   ██║██║╚██╗██║              ║
-    ║     ██║ ╚████║███████╗╚██████╔╝██║ ╚████║              ║
-    ║     ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝              ║
-    ║                                                          ║
-    ║         ███████╗ ██████╗ ██╗     ██╗████████╗          ║
-    ║         ██╔════╝██╔═══██╗██║     ██║╚══██╔══╝          ║
-    ║         ███████╗██║   ██║██║     ██║   ██║             ║
-    ║         ╚════██║██║   ██║██║     ██║   ██║             ║
-    ║         ███████║╚██████╔╝███████╗██║   ██║             ║
-    ║         ╚══════╝ ╚═════╝ ╚══════╝╚═╝   ╚═╝             ║
-    ║                                                          ║
-    ║                  ♠ ♥ ♦ ♣                                ║
-    ║                                                          ║
-    ║              === HOW TO PLAY ===                        ║
-    ║                                                          ║
-    ║   • Build foundations from Ace to King by suit         ║
-    ║   • Stack tableau cards in descending order            ║
-    ║   • Alternate colors (red on black, black on red)      ║
-    ║   • Press SPACE to draw cards                          ║
-    ║   • Press 1-7 to select columns                        ║
-    ║   • Press A for auto-move                              ║
-    ║   • Click cards with mouse to move them                ║
-    ║                                                          ║
-    ║              Press any key to start...                  ║
-    ║                                                          ║
-    ╚══════════════════════════════════════════════════════════╝"#;
+    let lines = vec![
+        "",
+        "     ███╗   ██╗███████╗ ██████╗ ███╗   ██╗",
+        "     ████╗  ██║██╔════╝██╔═══██╗████╗  ██║",
+        "     ██╔██╗ ██║█████╗  ██║   ██║██╔██╗ ██║",
+        "     ██║╚██╗██║██╔══╝  ██║   ██║██║╚██╗██║",
+        "     ██║ ╚████║███████╗╚██████╔╝██║ ╚████║",
+        "     ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝",
+        "",
+        "         ███████╗ ██████╗ ██╗     ██╗████████╗",
+        "         ██╔════╝██╔═══██╗██║     ██║╚══██╔══╝",
+        "         ███████╗██║   ██║██║     ██║   ██║",
+        "         ╚════██║██║   ██║██║     ██║   ██║",
+        "         ███████║╚██████╔╝███████╗██║   ██║",
+        "         ╚══════╝ ╚═════╝ ╚══════╝╚═╝   ╚═╝",
+        "",
+        "                  ♠ ♥ ♦ ♣",
+        "",
+        "              === HOW TO PLAY ===",
+        "",
+        "   • Build foundations from Ace to King by suit",
+        "   • Stack tableau cards in descending order",
+        "   • Alternate colors (red on black, black on red)",
+        "   • Click cards to select, click again to move",
+        "   • Press SPACE to draw cards",
+        "   • Press A for auto-move",
+        "",
+        "              Press any key to start...",
+    ];
     
-    execute!(
-        stdout(),
-        MoveTo(10, 3),
-        SetForegroundColor(Color::Rgb { r: 255, g: 50, b: 255 }),
-        Print(welcome),
-        ResetColor
-    )?;
+    for (i, line) in lines.iter().enumerate() {
+        execute!(
+            stdout(),
+            MoveTo(10, 3 + i as u16),
+            SetForegroundColor(Color::Rgb { r: 255, g: 50, b: 255 }),
+            Print(line),
+            ResetColor
+        )?;
+    }
     
     Ok(())
 }
@@ -202,7 +181,6 @@ fn wait_for_keypress() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(_) = event::read()? {
-                // Clear the screen completely before returning
                 execute!(
                     stdout(),
                     Clear(ClearType::All),
@@ -243,16 +221,15 @@ fn confirm_quit() -> Result<bool, Box<dyn std::error::Error>> {
 }
 
 fn show_final_stats(game: &GameState) {
-    println!("\n╔════════════════════════════════════╗");
-    println!("║         GAME STATISTICS            ║");
-    println!("╠════════════════════════════════════╣");
-    println!("║ Final Score: {:6}                ║", game.score);
-    println!("║ Total Moves: {:6}                ║", game.move_count);
-    println!("║ Status: {}            ║", if game.is_won() { "🏆 VICTORY!   " } else { "Game Ended    " });
-    println!("╚════════════════════════════════════╝");
+    println!("\n════════════════════════════════════════");
+    println!("         GAME STATISTICS");
+    println!("════════════════════════════════════════");
+    println!(" Final Score: {}", game.score);
+    println!(" Total Moves: {}", game.move_count);
+    println!(" Status: {}", if game.is_won() { "🏆 VICTORY!" } else { "Game Ended" });
+    println!("════════════════════════════════════════");
     println!("\nThanks for playing Neon Solitaire!");
     
-    // Suggest improvements
     if !game.is_won() {
         println!("\n💡 Tips for next time:");
         println!("  • Try to uncover face-down cards early");

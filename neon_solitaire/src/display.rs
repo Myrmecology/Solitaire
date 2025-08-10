@@ -9,7 +9,7 @@ use crossterm::{
 use std::io::{stdout, Write};
 
 pub struct Display {
-    pub selected_position: (usize, usize),  // (x, y) position for mouse/keyboard
+    pub selected_position: (usize, usize),
     pub hover_pile: Option<(PileType, usize, usize)>,
 }
 
@@ -45,7 +45,8 @@ impl Display {
     }
 
     pub fn draw_game(&self, game: &GameState) -> std::io::Result<()> {
-        execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+        // Move to top-left instead of clearing entire screen
+        execute!(stdout(), MoveTo(0, 0))?;
         
         // Draw title
         self.draw_title()?;
@@ -66,13 +67,18 @@ impl Display {
         self.draw_controls()?;
         
         // Draw hint if available
+        execute!(stdout(), MoveTo(0, 23))?;
         if let Some(hint) = game.get_hint() {
             execute!(
                 stdout(),
-                MoveTo(0, 23),
                 SetForegroundColor(Color::Rgb { r: 100, g: 255, b: 100 }),
-                Print(format!("💡 Hint: {}", hint)),
+                Print(format!("💡 Hint: {}                                        ", hint)),
                 ResetColor
+            )?;
+        } else {
+            execute!(
+                stdout(),
+                Print("                                                                      ")
             )?;
         }
         
@@ -81,15 +87,15 @@ impl Display {
     }
 
     fn draw_title(&self) -> std::io::Result<()> {
-        let title = "╔══════════════════════════════════════════╗
-║      N E O N   S O L I T A I R E        ║
-╚══════════════════════════════════════════╝";
-        
         execute!(
             stdout(),
-            MoveTo(15, 0),
+            MoveTo(20, 0),
             SetForegroundColor(Color::Rgb { r: 255, g: 0, b: 255 }),
-            Print(title.to_string()),
+            Print("═══════════════════════════════════════"),
+            MoveTo(20, 1),
+            Print("      N E O N   S O L I T A I R E     "),
+            MoveTo(20, 2),
+            Print("═══════════════════════════════════════"),
             ResetColor
         )?;
         Ok(())
@@ -100,11 +106,11 @@ impl Display {
             stdout(),
             MoveTo(2, 4),
             SetForegroundColor(Color::Rgb { r: 100, g: 200, b: 255 }),
-            Print(format!("Score: {} ", game.score)),
+            Print(format!("Score: {:4} ", game.score)),
             SetForegroundColor(Color::Rgb { r: 255, g: 200, b: 100 }),
-            Print(format!("Moves: {} ", game.move_count)),
+            Print(format!("Moves: {:4} ", game.move_count)),
             SetForegroundColor(Color::Rgb { r: 200, g: 100, b: 255 }),
-            Print(format!("Draw: {}", if game.draw_count == 1 { "1 card" } else { "3 cards" })),
+            Print(format!("Draw: {}     ", if game.draw_count == 1 { "1 card " } else { "3 cards" })),
             ResetColor
         )?;
         Ok(())
@@ -132,7 +138,7 @@ impl Display {
             execute!(
                 stdout(),
                 SetForegroundColor(Color::Rgb { r: 100, g: 100, b: 200 }),
-                Print(format!("[{}]  ", game.stock.len())),
+                Print(format!("[{:2}] ", game.stock.len())),
                 ResetColor
             )?;
         }
@@ -149,16 +155,18 @@ impl Display {
             execute!(
                 stdout(),
                 SetForegroundColor(Color::Rgb { r: 100, g: 100, b: 100 }),
-                Print("[ ]"),
+                Print("[ ]          "),
                 ResetColor
             )?;
         } else {
-            // Show up to 3 waste cards
             let start = if game.waste.len() > 3 { game.waste.len() - 3 } else { 0 };
-            for card in &game.waste[start..] {
-                self.draw_card_compact(card, false)?;
+            for (i, card) in game.waste[start..].iter().enumerate() {
+                let is_selected = game.selected_card == Some((PileType::Waste, 0, start + i));
+                self.draw_card_compact(card, is_selected)?;
                 execute!(stdout(), Print(" "))?;
             }
+            // Clear any remaining space
+            execute!(stdout(), Print("          "))?;
         }
         
         Ok(())
@@ -215,18 +223,23 @@ impl Display {
         // Find max column height
         let max_height = game.tableau.iter().map(|col| col.len()).max().unwrap_or(0);
         
-        // Draw cards
-        for row in 0..max_height.max(1) {
+        // Draw cards - add padding to clear old cards
+        for row in 0..(max_height + 5) {
             execute!(stdout(), MoveTo(2, 10 + row as u16))?;
             
-            for col in 0..7 {
-                if row < game.tableau[col].len() {
-                    let card = &game.tableau[col][row];
-                    let is_selected = game.selected_card == Some((PileType::Tableau, col, row));
-                    self.draw_card_compact(card, is_selected)?;
-                } else {
-                    execute!(stdout(), Print("      "))?;
+            if row < max_height {
+                for col in 0..7 {
+                    if row < game.tableau[col].len() {
+                        let card = &game.tableau[col][row];
+                        let is_selected = game.selected_card == Some((PileType::Tableau, col, row));
+                        self.draw_card_compact(card, is_selected)?;
+                    } else {
+                        execute!(stdout(), Print("      "))?;
+                    }
                 }
+            } else {
+                // Clear remaining rows
+                execute!(stdout(), Print("                                                  "))?;
             }
         }
         
@@ -297,16 +310,17 @@ impl Display {
     }
 
     fn draw_controls(&self) -> std::io::Result<()> {
-        let controls = "═══════════════════════════════════════════════════════════════
-[1-7] Select Column | [W] Waste | [S] Stock | [F] Foundation
-[Space] Draw | [Z] Undo | [H] Hint | [A] Auto | [Q] Quit
-═══════════════════════════════════════════════════════════════";
-        
         execute!(
             stdout(),
             MoveTo(0, 25),
             SetForegroundColor(Color::Rgb { r: 150, g: 150, b: 200 }),
-            Print(controls),
+            Print("═══════════════════════════════════════════════════════════════"),
+            MoveTo(0, 26),
+            Print("[1-7] Select Column | [W] Waste | [S] Stock | [F] Foundation  "),
+            MoveTo(0, 27),
+            Print("[Space] Draw | [Z] Undo | [H] Hint | [A] Auto | [Q] Quit     "),
+            MoveTo(0, 28),
+            Print("═══════════════════════════════════════════════════════════════"),
             ResetColor
         )?;
         
@@ -314,21 +328,18 @@ impl Display {
     }
 
     pub fn draw_win_animation(&self) -> std::io::Result<()> {
-        let win_text = r#"
-╔════════════════════════════════════╗
-║                                    ║
-║    🎉  Y O U   W I N !  🎉        ║
-║                                    ║
-║    N E O N   V I C T O R Y        ║
-║                                    ║
-╚════════════════════════════════════╝"#;
-
         execute!(
             stdout(),
             Clear(ClearType::All),
             MoveTo(20, 10),
             SetForegroundColor(Color::Rgb { r: 255, g: 50, b: 255 }),
-            Print(win_text),
+            Print("════════════════════════════════════"),
+            MoveTo(20, 11),
+            Print("    🎉  Y O U   W I N !  🎉        "),
+            MoveTo(20, 12),
+            Print("    N E O N   V I C T O R Y        "),
+            MoveTo(20, 13),
+            Print("════════════════════════════════════"),
             ResetColor
         )?;
         
