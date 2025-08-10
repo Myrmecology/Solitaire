@@ -1,0 +1,216 @@
+# ====================
+# Rust Build Artifacts
+# ====================
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# ====================
+# Security & Keys
+# ====================
+# Yubikey and authentication
+*.key
+*.pem
+*.cer
+*.crt
+*.p12
+*.pfx
+*.gpg
+*.asc
+*.sig
+*_rsa
+*_dsa
+*_ed25519
+*_ecdsa
+authorized_keys
+known_hosts
+*.kdbx
+*.keystore
+*.jks
+
+# SSH
+.ssh/
+id_rsa*
+id_dsa*
+id_ed25519*
+id_ecdsa*
+
+# Tokens and secrets
+*.token
+*.secret
+*.secrets
+*.password
+*.passwd
+*.pwd
+.env
+.env.*
+*.env
+secrets/
+credentials/
+tokens/
+
+# ====================
+# Personal/Sensitive Data
+# ====================
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+personal/
+private/
+sensitive/
+backup/
+backups/
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+*.temp
+*.cache
+*.session
+
+# ====================
+# OS Files
+# ====================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+*.stackdump
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+.Trash-*
+.nfs*
+
+# ====================
+# IDE & Editors
+# ====================
+# VS Code
+.vscode/
+*.code-workspace
+.history/
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*.swn
+.*.swp
+.*.swo
+.*.swn
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+.emacs.desktop
+.emacs.desktop.lock
+
+# ====================
+# Development
+# ====================
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+core
+core.*
+*.core
+valgrind-*.log
+
+# Test coverage
+*.gcno
+*.gcda
+*.gcov
+coverage/
+*.lcov
+*.profraw
+*.profdata
+
+# Dependencies
+node_modules/
+vendor/
+bower_components/
+
+# ====================
+# Project Specific
+# ====================
+# Game saves (if we store locally)
+saves/
+savegames/
+*.save
+*.sav
+
+# Statistics (might contain patterns)
+stats/
+statistics/
+*.stats
+
+# User configuration
+config/local/
+user_settings.json
+preferences.json
+
+# ====================
+# Archives & Packages
+# ====================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.dmg
+*.iso
+*.jar
+*.war
+*.ear
+
+# ====================
+# Yubikey Specific
+# ====================
+# Yubikey Manager files
+.ykman/
+ykman.log
+yubico/
+*.ykpiv
+*.ykcs11
+
+# PIV certificates
+piv/
+*.csr
+*.der
+
+# ====================
+# Never Track These
+# ====================
+NEVER_COMMIT/
+DO_NOT_COMMIT/
+LOCAL_ONLY/
