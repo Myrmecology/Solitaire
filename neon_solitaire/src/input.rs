@@ -1,10 +1,14 @@
+use crate::card::Card;
 use crate::game::{GameState, PileType};
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
+    event::{self, Event, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind, EnableMouseCapture, DisableMouseCapture},
     terminal,
+    execute,
 };
 use std::time::Duration;
+use std::io::stdout;
 
+#[derive(Copy, Clone)]
 pub enum InputAction {
     SelectColumn(usize),
     SelectWaste,
@@ -28,8 +32,14 @@ pub struct InputHandler {
 
 impl InputHandler {
     pub fn new() -> Self {
-        // Enable mouse support
+        // Enable raw mode and mouse support
         let _ = terminal::enable_raw_mode();
+        
+        // Actually execute the mouse enable command
+        let _ = execute!(
+            stdout(),
+            EnableMouseCapture
+        );
         
         InputHandler {
             mouse_enabled: true,
@@ -40,7 +50,7 @@ impl InputHandler {
 
     pub fn poll_input(&mut self) -> InputAction {
         // Poll for events with a small timeout
-        if event::poll(Duration::from_millis(50)).unwrap_or(false) {
+        if event::poll(Duration::from_millis(100)).unwrap_or(false) {
             if let Ok(event) = event::read() {
                 return self.handle_event(event);
             }
@@ -121,6 +131,10 @@ impl InputHandler {
 
     pub fn cleanup(&self) {
         let _ = terminal::disable_raw_mode();
+        let _ = execute!(
+            stdout(),
+            DisableMouseCapture
+        );
     }
 }
 
@@ -253,7 +267,7 @@ pub fn handle_game_action(game: &mut GameState, action: InputAction) -> bool {
                     }
                     _ => {
                         // Handle like column selection
-                        if let Some(selected) = game.selected_card {
+                        if let Some(_selected) = game.selected_card {
                             // Try to move selected card to clicked position
                             // This is simplified - you'd need more logic here
                             game.selected_card = None;

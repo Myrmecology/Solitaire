@@ -3,8 +3,8 @@ use crate::card::Card;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     execute,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize},
-    terminal::{Clear, ClearType, EnableLineWrap, DisableLineWrap, size},
+    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    terminal::{Clear, ClearType, EnableLineWrap, DisableLineWrap},
 };
 use std::io::{stdout, Write};
 
@@ -157,7 +157,7 @@ impl Display {
             let start = if game.waste.len() > 3 { game.waste.len() - 3 } else { 0 };
             for card in &game.waste[start..] {
                 self.draw_card_compact(card, false)?;
-                print!(" ");
+                execute!(stdout(), Print(" "))?;
             }
         }
         
@@ -193,7 +193,7 @@ impl Display {
             } else {
                 let card = foundation.last().unwrap();
                 self.draw_card_compact(card, false)?;
-                print!(" ");
+                execute!(stdout(), Print(" "))?;
             }
         }
         
@@ -225,10 +225,9 @@ impl Display {
                     let is_selected = game.selected_card == Some((PileType::Tableau, col, row));
                     self.draw_card_compact(card, is_selected)?;
                 } else {
-                    print!("      ");
+                    execute!(stdout(), Print("      "))?;
                 }
             }
-            println!();
         }
         
         Ok(())
@@ -281,7 +280,7 @@ impl Display {
                     stdout(),
                     SetBackgroundColor(Color::Rgb { r: 100, g: 0, b: 100 }),
                     SetForegroundColor(card.get_color()),
-                    Print(format!("{}{}", rank_str, suit_char)),
+                    Print(format!("[{}{}]", rank_str, suit_char)),
                     ResetColor
                 )?;
             } else {

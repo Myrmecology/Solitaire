@@ -1,4 +1,4 @@
-use crate::card::{Card, Rank, Suit, create_standard_deck};
+use crate::card::{Card, Rank, create_standard_deck};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
