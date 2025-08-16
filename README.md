@@ -4,6 +4,8 @@
 
 Work in progress
 
+For a video demo, please check out: https://www.youtube.com/watch?v=eomSZTt5JJU
+
 ### Prerequisites
 
 - **Rust** (1.70.0 or later)
